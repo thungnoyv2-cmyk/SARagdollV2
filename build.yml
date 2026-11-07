@@ -1,0 +1,44 @@
+name: Build SARagdoll (armeabi-v7a)
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Bullet source
+        run: git clone --depth 1 https://github.com/bulletphysics/bullet3 bullet_src
+
+      - name: Build Bullet for armeabi-v7a
+        run: |
+          cmake -S bullet_src -B build_bt \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-21 \
+            -DBUILD_BULLET2_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF -DBUILD_EXTRAS=OFF \
+            -DBUILD_CPU_DEMOS=OFF -DBUILD_OPENGL3_DEMOS=OFF \
+            -DBUILD_PYBULLET=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake --build build_bt -j4 --target BulletDynamics BulletCollision LinearMath
+          mkdir -p libs_bullet/armeabi-v7a
+          find build_bt -name "libBulletDynamics.a" -exec cp {} libs_bullet/armeabi-v7a/ \;
+          find build_bt -name "libBulletCollision.a" -exec cp {} libs_bullet/armeabi-v7a/ \;
+          find build_bt -name "libLinearMath.a" -exec cp {} libs_bullet/armeabi-v7a/ \;
+
+      - name: Get AML headers
+        run: |
+          git clone --depth 1 https://github.com/RusJJ/AndroidModLoader AML_repo
+          mkdir -p jni/aml_headers
+          cp -r AML_repo/mod jni/aml_headers/mod || true
+          ls -R jni/aml_headers | head -30
+
+      - name: Build mod
+        run: $ANDROID_NDK_HOME/ndk-build
+
+      - name: Upload .so
+        uses: actions/upload-artifact@v4
+        with:
+          name: libSARagdoll
+          path: libs/armeabi-v7a/libSARagdoll.so
